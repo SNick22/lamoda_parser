@@ -6,6 +6,7 @@ from colors_translate import translate
 import json
 
 images_count = {}
+links_in_dataset = []
 parsed_images = 0
 fails = 0
 
@@ -32,9 +33,9 @@ def save_product(category, color, image):
     if not os.path.exists(f'dataset/{folder_name}'):
         os.mkdir(f'dataset/{folder_name}')
         images_count[folder_name] = 0
-    with open(f'dataset/{folder_name}/{images_count[folder_name] + 1}.jpg', 'wb') as file:
-        file.write(image)
     images_count[folder_name] += 1
+    with open(f'dataset/{folder_name}/{images_count[folder_name]}.jpg', 'wb') as file:
+        file.write(image)
 
 
 def parse_from_endpoint(category, url, endpoint, limit):
@@ -48,6 +49,9 @@ def parse_from_endpoint(category, url, endpoint, limit):
             break
         for product in products:
             link = product.find('a').get('href')
+            if link in links_in_dataset:
+                print(f'Продукт {url + link} уже загружен')
+                continue
             print(f'Парсим продукт: {url + link}')
             product_responce = requests.get(url + link)
             product_soup = BeautifulSoup(product_responce.text, 'html.parser')
@@ -58,6 +62,8 @@ def parse_from_endpoint(category, url, endpoint, limit):
                 continue
             image = get_image(product_soup)
             save_product(category, color, image)
+            with open('dataset.txt', 'a') as file:
+                file.write(f'{link}\n')
             limit -= 1
             parsed_images += 1
             print(f'Картинок загружено: {parsed_images}')
@@ -74,7 +80,18 @@ def parse_from_endpoint(category, url, endpoint, limit):
 def start():
     category = ''
     url = 'https://www.lamoda.ru'
-    os.mkdir('dataset')
+    if not os.path.exists('dataset'):
+        os.mkdir('dataset')
+    else:
+        print('Инициализирую уже загруженные продукты...')
+        with open('dataset.txt') as file:
+            text = file.read()
+            global links_in_dataset
+            links_in_dataset = text.split('\n')
+        dataset_folders = os.listdir('dataset')
+        for folder in dataset_folders:
+            files = os.listdir(f'dataset/{folder}')
+            images_count[folder] = len(files)
     print('Введите лимит продуктов по каждой из ссылок:')
     limit = int(input())
     with open('endpoints.txt') as file:
